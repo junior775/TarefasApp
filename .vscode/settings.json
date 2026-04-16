@@ -3,5 +3,13 @@
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
-  }
+  },
+  "json.schemas": [
+    {
+      "fileMatch": [
+        "/backend/db.json"
+      ],
+      "url": "./node_modules/json-server/schema.json"
+    }
+  ]
 }

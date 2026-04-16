@@ -1,0 +1,12 @@
+{
+  "usuarios": [
+    {
+      "id": "1",
+      "nome": "Emerson",
+      "email": "emerson@gmail.com",
+      "senha": "123"
+    }
+  ],
+  "tarefas": [],
+  "$schema": "./node_modules/json-server/schema.json"
+}
