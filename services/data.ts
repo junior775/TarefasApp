@@ -9,6 +9,12 @@ export type Usuario = {
   senha: string;
 };
 
+type CreateUserInput = {
+  nome: string;
+  email: string;
+  senha: string;
+};
+
 export type Prioridade = "baixa" | "media" | "alta";
 export type Categoria =
   | "Trabalho"
@@ -43,7 +49,7 @@ const DEFAULT_USERS: Usuario[] = [
   {
     id: "1",
     nome: "Emerson",
-    email: "emerson@gmail.com",
+    email: "emersonrobertojunior07@gmail.com",
     senha: "123",
   },
 ];
@@ -154,6 +160,48 @@ export async function getUsuarios() {
   }
 }
 
+export async function createUsuario({ nome, email, senha }: CreateUserInput) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const { usuarios } = await getUsuarios();
+  const usuarioExistente = usuarios.find(
+    (usuario) => usuario.email.toLowerCase() === normalizedEmail
+  );
+
+  if (usuarioExistente) {
+    throw new Error("EMAIL_JA_CADASTRADO");
+  }
+
+  const novoUsuario: Usuario = {
+    id:
+      usuarios.length > 0
+        ? String(Math.max(...usuarios.map((usuario) => Number(usuario.id) || 0)) + 1)
+        : "1",
+    nome: nome.trim(),
+    email: normalizedEmail,
+    senha,
+  };
+
+  try {
+    const resposta = await apiFetch("/usuarios", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(novoUsuario),
+    });
+
+    if (!resposta.ok) {
+      throw new Error("Falha ao criar usuario");
+    }
+
+    const usuariosAtualizados = [...usuarios, novoUsuario];
+    await writeJson(LOCAL_USERS_KEY, usuariosAtualizados);
+    return { usuario: novoUsuario, offline: false };
+  } catch {
+    const usuariosAtualizados = [...usuarios, novoUsuario];
+    await writeJson(LOCAL_USERS_KEY, usuariosAtualizados);
+    return { usuario: novoUsuario, offline: true };
+  }
+}
+
 export async function setSessionUser(usuario: Usuario) {
   await writeJson(SESSION_USER_KEY, usuario);
 }
@@ -258,6 +306,32 @@ export async function updateTarefa(item: Tarefa) {
 
     if (!resposta.ok) {
       throw new Error("Falha ao atualizar tarefa");
+    }
+
+    return { offline: false };
+  } catch {
+    const tarefas = await readLocalTasks();
+    const updatedTasks = tarefas.map((tarefa) =>
+      tarefa.id === item.id ? updatedItem : tarefa
+    );
+
+    await writeLocalTasks(updatedTasks);
+    return { offline: true };
+  }
+}
+
+export async function saveTarefa(item: Tarefa) {
+  const updatedItem = normalizeTask(item);
+
+  try {
+    const resposta = await apiFetch(`/tarefas/${item.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updatedItem),
+    });
+
+    if (!resposta.ok) {
+      throw new Error("Falha ao salvar tarefa");
     }
 
     return { offline: false };

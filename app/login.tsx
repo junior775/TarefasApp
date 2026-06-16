@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   Text,
@@ -10,14 +11,32 @@ import {
   View,
 } from "react-native";
 
-import { getUsuarios, setSessionUser } from "@/services/data";
+import { createUsuario, getUsuarios, setSessionUser } from "@/services/data";
+
+type AuthMode = "login" | "cadastro";
 
 export default function Login() {
+  const [modo, setModo] = useState<AuthMode>("login");
+  const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [confirmarSenha, setConfirmarSenha] = useState("");
   const [carregando, setCarregando] = useState(false);
   const [mensagem, setMensagem] = useState("");
   const router = useRouter();
+
+  const limparFormulario = () => {
+    setNome("");
+    setEmail("");
+    setSenha("");
+    setConfirmarSenha("");
+    setMensagem("");
+  };
+
+  const alternarModo = (novoModo: AuthMode) => {
+    setModo(novoModo);
+    limparFormulario();
+  };
 
   const entrar = async () => {
     if (!email.trim() || !senha.trim() || carregando) return;
@@ -50,6 +69,82 @@ export default function Login() {
     } finally {
       setCarregando(false);
     }
+  };
+
+  const criarConta = async () => {
+    if (!nome.trim() || !email.trim() || !senha.trim() || carregando) return;
+
+    if (senha.length < 3) {
+      alert("A senha precisa ter pelo menos 3 caracteres.");
+      return;
+    }
+
+    if (senha !== confirmarSenha) {
+      alert("As senhas nao conferem.");
+      return;
+    }
+
+    try {
+      setCarregando(true);
+      setMensagem("");
+
+      const { usuario, offline } = await createUsuario({
+        nome,
+        email,
+        senha,
+      });
+
+      await setSessionUser(usuario);
+
+      if (offline) {
+        setMensagem("Conta criada em modo offline neste aparelho.");
+      }
+
+      router.replace("/(tabs)");
+    } catch (erro) {
+      if (erro instanceof Error && erro.message === "EMAIL_JA_CADASTRADO") {
+        alert("Esse email ja esta cadastrado.");
+        return;
+      }
+
+      console.log(erro);
+      alert("Nao foi possivel criar a conta. Tente novamente.");
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  const recuperarSenha = async () => {
+    const emailInformado = email.trim().toLowerCase();
+
+    if (!emailInformado) {
+      alert("Digite seu email para recuperar a senha.");
+      return;
+    }
+
+    const { usuarios } = await getUsuarios();
+    const usuarioEncontrado = usuarios.find(
+      (usuario) => usuario.email.toLowerCase() === emailInformado
+    );
+
+    if (!usuarioEncontrado) {
+      alert("Email nao encontrado.");
+      return;
+    }
+
+    const assunto = encodeURIComponent("Recuperacao de senha - TarefasApp");
+    const corpo = encodeURIComponent(
+      `Ola ${usuarioEncontrado.nome},\n\nSua senha cadastrada no TarefasApp e: ${usuarioEncontrado.senha}\n\nSe voce nao solicitou esta recuperacao, ignore esta mensagem.`
+    );
+    const url = `mailto:${usuarioEncontrado.email}?subject=${assunto}&body=${corpo}`;
+    const podeAbrirEmail = await Linking.canOpenURL(url);
+
+    if (!podeAbrirEmail) {
+      alert(`Senha cadastrada: ${usuarioEncontrado.senha}`);
+      return;
+    }
+
+    await Linking.openURL(url);
   };
 
   return (
@@ -182,13 +277,89 @@ export default function Login() {
           >
             <View style={{ flex: 1, paddingRight: 12 }}>
               <Text style={{ fontSize: 24, fontWeight: "800", color: "#16253a" }}>
-                Login
+                {modo === "login" ? "Login" : "Criar conta"}
               </Text>
               <Text style={{ color: "#6f7a86", marginTop: 4 }}>
-                Entre com a sua conta para acessar o painel.
+                {modo === "login"
+                  ? "Entre com a sua conta para acessar o painel."
+                  : "Cadastre seus dados para acessar o app."}
               </Text>
             </View>
           </View>
+
+          <View
+            style={{
+              flexDirection: "row",
+              backgroundColor: "#f1ebe0",
+              borderRadius: 18,
+              padding: 4,
+              marginBottom: 18,
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => alternarModo("login")}
+              style={{
+                flex: 1,
+                backgroundColor: modo === "login" ? "#245d91" : "transparent",
+                borderRadius: 14,
+                paddingVertical: 11,
+                alignItems: "center",
+              }}
+            >
+              <Text
+                style={{
+                  color: modo === "login" ? "#fff" : "#5f6770",
+                  fontWeight: "800",
+                }}
+              >
+                Entrar
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => alternarModo("cadastro")}
+              style={{
+                flex: 1,
+                backgroundColor: modo === "cadastro" ? "#245d91" : "transparent",
+                borderRadius: 14,
+                paddingVertical: 11,
+                alignItems: "center",
+              }}
+            >
+              <Text
+                style={{
+                  color: modo === "cadastro" ? "#fff" : "#5f6770",
+                  fontWeight: "800",
+                }}
+              >
+                Criar conta
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {modo === "cadastro" ? (
+            <>
+              <Text style={{ color: "#3d4b5b", fontWeight: "700", marginBottom: 8 }}>
+                Nome
+              </Text>
+              <TextInput
+                placeholder="Digite seu nome"
+                placeholderTextColor="#8e98a3"
+                value={nome}
+                onChangeText={setNome}
+                style={{
+                  backgroundColor: "#ffffff",
+                  borderRadius: 18,
+                  paddingHorizontal: 16,
+                  paddingVertical: 15,
+                  marginBottom: 16,
+                  borderWidth: 1,
+                  borderColor: "#e4dccd",
+                  color: "#182332",
+                }}
+              />
+            </>
+          ) : null}
 
           <Text style={{ color: "#3d4b5b", fontWeight: "700", marginBottom: 8 }}>
             Email
@@ -233,8 +404,47 @@ export default function Login() {
             }}
           />
 
+          {modo === "cadastro" ? (
+            <>
+              <Text style={{ color: "#3d4b5b", fontWeight: "700", marginBottom: 8 }}>
+                Confirmar senha
+              </Text>
+              <TextInput
+                placeholder="Digite a senha novamente"
+                placeholderTextColor="#8e98a3"
+                secureTextEntry
+                value={confirmarSenha}
+                onChangeText={setConfirmarSenha}
+                style={{
+                  backgroundColor: "#ffffff",
+                  borderRadius: 18,
+                  paddingHorizontal: 16,
+                  paddingVertical: 15,
+                  marginBottom: 18,
+                  borderWidth: 1,
+                  borderColor: "#e4dccd",
+                  color: "#182332",
+                }}
+              />
+            </>
+          ) : null}
+
+          {modo === "login" ? (
+            <TouchableOpacity
+              onPress={recuperarSenha}
+              style={{
+                alignSelf: "flex-end",
+                marginBottom: 16,
+              }}
+            >
+              <Text style={{ color: "#245d91", fontWeight: "800" }}>
+                Esqueci minha senha
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+
           <TouchableOpacity
-            onPress={entrar}
+            onPress={modo === "login" ? entrar : criarConta}
             disabled={carregando}
             style={{
               backgroundColor: carregando ? "#5e8ab7" : "#245d91",
@@ -249,7 +459,11 @@ export default function Login() {
             }}
           >
             <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>
-              {carregando ? "Entrando..." : "Entrar no painel"}
+              {carregando
+                ? "Aguarde..."
+                : modo === "login"
+                  ? "Entrar no painel"
+                  : "Criar conta"}
             </Text>
           </TouchableOpacity>
 

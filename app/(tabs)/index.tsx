@@ -18,6 +18,7 @@ import {
   getTarefas,
   Prioridade,
   removeTarefa,
+  saveTarefa,
   Tarefa,
   updateTarefa,
 } from "@/services/data";
@@ -100,6 +101,10 @@ export default function HomeScreen() {
     useState<Categoria>("Pessoal");
   const [prioridadeSelecionada, setPrioridadeSelecionada] =
     useState<Prioridade>("media");
+  const [tarefaEditandoId, setTarefaEditandoId] = useState<number | null>(null);
+  const [tarefaFocoId, setTarefaFocoId] = useState<number | null>(null);
+  const [focoSegundos, setFocoSegundos] = useState(25 * 60);
+  const [focoAtivo, setFocoAtivo] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const router = useRouter();
 
@@ -144,22 +149,49 @@ export default function HomeScreen() {
     }).start();
   }, [fadeAnim, router]);
 
+  useEffect(() => {
+    if (!focoAtivo) return;
+
+    const intervalId = setInterval(() => {
+      setFocoSegundos((segundos) => {
+        if (segundos <= 1) {
+          setFocoAtivo(false);
+          return 0;
+        }
+
+        return segundos - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [focoAtivo]);
+
   const adicionarTarefa = async () => {
     if (!titulo.trim()) return;
 
     try {
-      const { offline } = await createTarefa({
-        titulo: titulo.trim(),
-        observacao: observacao.trim(),
-        categoria: categoriaSelecionada,
-        prioridade: prioridadeSelecionada,
-      });
+      const tarefaEditando = tarefas.find((item) => item.id === tarefaEditandoId);
+      const { offline } = tarefaEditando
+        ? await saveTarefa({
+            ...tarefaEditando,
+            titulo: titulo.trim(),
+            observacao: observacao.trim(),
+            categoria: categoriaSelecionada,
+            prioridade: prioridadeSelecionada,
+          })
+        : await createTarefa({
+            titulo: titulo.trim(),
+            observacao: observacao.trim(),
+            categoria: categoriaSelecionada,
+            prioridade: prioridadeSelecionada,
+          });
 
       setModoOffline(offline);
       setTitulo("");
       setObservacao("");
       setCategoriaSelecionada("Pessoal");
       setPrioridadeSelecionada("media");
+      setTarefaEditandoId(null);
       await buscarTarefas();
     } catch (error) {
       console.log(error);
@@ -175,6 +207,39 @@ export default function HomeScreen() {
     setTitulo(item.titulo);
     setCategoriaSelecionada(item.categoria);
     setPrioridadeSelecionada(item.prioridade);
+  };
+
+  const editarTarefa = (item: Tarefa) => {
+    setTarefaEditandoId(item.id);
+    setTitulo(item.titulo);
+    setObservacao(item.observacao);
+    setCategoriaSelecionada(item.categoria);
+    setPrioridadeSelecionada(item.prioridade);
+  };
+
+  const cancelarEdicao = () => {
+    setTarefaEditandoId(null);
+    setTitulo("");
+    setObservacao("");
+    setCategoriaSelecionada("Pessoal");
+    setPrioridadeSelecionada("media");
+  };
+
+  const iniciarFoco = (item: Tarefa) => {
+    setTarefaFocoId(item.id);
+    setFocoSegundos(25 * 60);
+    setFocoAtivo(true);
+  };
+
+  const sugerirTarefa = () => {
+    const pendentes = tarefas.filter((item) => !item.concluida);
+    const sugestao = pendentes[Math.floor(Math.random() * pendentes.length)];
+
+    if (!sugestao) return;
+
+    setBusca(sugestao.titulo);
+    setFiltro("todas");
+    setTarefaFocoId(sugestao.id);
   };
 
   const deletarTarefa = async (id: number) => {
@@ -222,6 +287,11 @@ export default function HomeScreen() {
   );
   const progresso =
     tarefas.length === 0 ? 0 : Math.round((tarefasConcluidas.length / tarefas.length) * 100);
+  const tarefaFoco = tarefas.find((item) => item.id === tarefaFocoId);
+  const focoMinutos = Math.floor(focoSegundos / 60)
+    .toString()
+    .padStart(2, "0");
+  const focoSegundosRestantes = (focoSegundos % 60).toString().padStart(2, "0");
 
   const tarefasFiltradas = tarefas.filter((item) => {
     const matchBusca =
@@ -381,6 +451,78 @@ export default function HomeScreen() {
 
       <View
         style={{
+          backgroundColor: "#183a34",
+          borderRadius: 26,
+          padding: 18,
+          marginBottom: 18,
+          overflow: "hidden",
+        }}
+      >
+        <Text style={{ color: "#bce8d9", fontWeight: "800", marginBottom: 8 }}>
+          Modo foco
+        </Text>
+        <Text style={{ color: "#effbf6", fontSize: 26, fontWeight: "900" }}>
+          {focoMinutos}:{focoSegundosRestantes}
+        </Text>
+        <Text style={{ color: "#c9ddd6", marginTop: 8, lineHeight: 20 }}>
+          {tarefaFoco
+            ? `Foco atual: ${tarefaFoco.titulo}`
+            : "Escolha uma tarefa na lista ou use a sugestao automatica."}
+        </Text>
+
+        <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+          <TouchableOpacity
+            onPress={() => setFocoAtivo((ativo) => !ativo)}
+            disabled={!tarefaFoco}
+            style={{
+              flex: 1,
+              backgroundColor: tarefaFoco ? "#d8f3e8" : "rgba(255,255,255,0.16)",
+              borderRadius: 16,
+              paddingVertical: 12,
+              alignItems: "center",
+            }}
+          >
+            <Text
+              style={{
+                color: tarefaFoco ? "#183a34" : "#9fb3ad",
+                fontWeight: "800",
+              }}
+            >
+              {focoAtivo ? "Pausar" : "Iniciar"}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => {
+              setFocoAtivo(false);
+              setFocoSegundos(25 * 60);
+            }}
+            style={{
+              backgroundColor: "rgba(255,255,255,0.16)",
+              borderRadius: 16,
+              paddingVertical: 12,
+              paddingHorizontal: 16,
+            }}
+          >
+            <Text style={{ color: "#effbf6", fontWeight: "800" }}>Reset</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={sugerirTarefa}
+            style={{
+              backgroundColor: "#f6d98c",
+              borderRadius: 16,
+              paddingVertical: 12,
+              paddingHorizontal: 16,
+            }}
+          >
+            <Text style={{ color: "#4c3606", fontWeight: "800" }}>Sugerir</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View
+        style={{
           backgroundColor: "#fffaf4",
           borderRadius: 26,
           padding: 18,
@@ -390,10 +532,12 @@ export default function HomeScreen() {
         }}
       >
         <Text style={{ fontSize: 20, fontWeight: "800", color: "#1b2b3d" }}>
-          Nova tarefa
+          {tarefaEditandoId ? "Editar tarefa" : "Nova tarefa"}
         </Text>
         <Text style={{ color: "#6f7a86", marginTop: 4, marginBottom: 16 }}>
-          Crie tarefas com prioridade, categoria e observacao.
+          {tarefaEditandoId
+            ? "Ajuste os dados e salve as alteracoes."
+            : "Crie tarefas com prioridade, categoria e observacao."}
         </Text>
 
         <TextInput
@@ -540,9 +684,26 @@ export default function HomeScreen() {
           }}
         >
           <Text style={{ color: "#fff", fontSize: 16, fontWeight: "800" }}>
-            Adicionar tarefa
+            {tarefaEditandoId ? "Salvar tarefa" : "Adicionar tarefa"}
           </Text>
         </TouchableOpacity>
+
+        {tarefaEditandoId ? (
+          <TouchableOpacity
+            onPress={cancelarEdicao}
+            style={{
+              backgroundColor: "#f1ebe0",
+              borderRadius: 18,
+              paddingVertical: 14,
+              alignItems: "center",
+              marginTop: 10,
+            }}
+          >
+            <Text style={{ color: "#5f6770", fontSize: 15, fontWeight: "800" }}>
+              Cancelar edicao
+            </Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <View
@@ -792,7 +953,14 @@ export default function HomeScreen() {
                     </Text>
                   ) : null}
 
-                  <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      flexWrap: "wrap",
+                      gap: 10,
+                      marginTop: 14,
+                    }}
+                  >
                     <TouchableOpacity
                       onPress={() => concluirTarefa(item)}
                       style={{
@@ -811,6 +979,35 @@ export default function HomeScreen() {
                         {item.concluida ? "Reabrir" : "Concluir"}
                       </Text>
                     </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => editarTarefa(item)}
+                      style={{
+                        backgroundColor: "#f8efe2",
+                        borderRadius: 14,
+                        paddingVertical: 10,
+                        paddingHorizontal: 14,
+                      }}
+                    >
+                      <Text style={{ color: "#7b5a1f", fontWeight: "700" }}>Editar</Text>
+                    </TouchableOpacity>
+
+                    {!item.concluida ? (
+                      <TouchableOpacity
+                        onPress={() => iniciarFoco(item)}
+                        style={{
+                          backgroundColor:
+                            tarefaFocoId === item.id ? "#d8f3e8" : "#edf6f3",
+                          borderRadius: 14,
+                          paddingVertical: 10,
+                          paddingHorizontal: 14,
+                        }}
+                      >
+                        <Text style={{ color: "#25614f", fontWeight: "700" }}>
+                          {tarefaFocoId === item.id ? "Em foco" : "Focar"}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
 
                     <TouchableOpacity
                       onPress={() => deletarTarefa(item.id)}

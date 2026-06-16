@@ -1,50 +1,116 @@
-# Welcome to your Expo app 👋
+# TarefasApp
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Aplicativo de gerenciamento de tarefas desenvolvido com Expo e React Native, com login, cadastro de tarefas, edicao, exclusao, busca, modo foco e funcionamento online/offline.
 
-## Get started
+## Entrega final
 
-1. Install dependencies
+Este repositorio contem os itens solicitados para a entrega final da disciplina:
 
-   ```bash
-   npm install
-   ```
+- Processo de SDD documentado.
+- 10 casos de teste automatizados com Playwright.
+- Evidencias dos testes com prints.
+- Relatorio completo dos testes.
+- Relatorio de seguranca com base no padrao OWASP.
+- Pipeline no GitHub Actions para validar o projeto.
 
-2. Start the app
+## Documentacao
 
-   ```bash
-   npx expo start
-   ```
+- [Processo de SDD](./docs/processo-sdd.md)
+- [Relatorio de testes Playwright](./docs/relatorio-testes-playwright.md)
+- [Relatorio de seguranca OWASP](./docs/relatorio-seguranca-owasp.md)
+- [Evidencias com prints](./docs/evidencias)
 
-In the output, you'll find options to open the app in a
+## Casos de teste Playwright
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Foram implementados 10 casos de teste:
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+1. Abrir a pagina de login.
+2. Tentar login sem preencher campos.
+3. Login com usuario valido.
+4. Login com senha invalida.
+5. Verificar carregamento da lista de tarefas.
+6. Adicionar uma tarefa.
+7. Editar uma tarefa.
+8. Excluir uma tarefa.
+9. Verificar se a tarefa adicionada aparece na lista.
+10. Fazer logout e retornar para login.
 
-## Get a fresh project
+Arquivo dos testes:
 
-When you're ready, run:
-
-```bash
-npm run reset-project
+```text
+tests/tarefas.spec.ts
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Como rodar o projeto
 
-## Learn more
+Instale as dependencias:
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+npm install
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Inicie o backend:
 
-## Join the community
+```bash
+npm run server
+```
 
-Join our community of developers creating universal apps.
+Em outro terminal, inicie o Expo:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+npx expo start --clear
+```
+
+Usuario de teste:
+
+```text
+Email: emersonrobertojunior07@gmail.com
+Senha: 123
+```
+
+## Como rodar os testes
+
+Executar os testes E2E:
+
+```bash
+npm run test:e2e
+```
+
+Abrir o relatorio HTML do Playwright:
+
+```bash
+npm run test:e2e:report
+```
+
+Rodar validacoes de qualidade:
+
+```bash
+npm run lint
+npx tsc --noEmit
+```
+
+## Pipeline
+
+O workflow do GitHub Actions esta configurado em:
+
+```text
+.github/workflows/playwright.yml
+```
+
+Ele executa:
+
+- `npm ci`
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run test:e2e`
+- Upload do relatorio HTML do Playwright
+
+## Seguranca
+
+A analise OWASP esta documentada em:
+
+```text
+docs/relatorio-seguranca-owasp.md
+```
+
+O relatorio informa quais itens foram resolvidos, parcialmente resolvidos, nao resolvidos ou nao aplicaveis ao escopo academico do projeto.
