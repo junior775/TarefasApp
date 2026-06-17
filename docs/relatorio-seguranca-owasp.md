@@ -1,186 +1,304 @@
-# Relatorio de Seguranca OWASP - TarefasApp
+# Relatorio de Erros e Acertos - OWASP Top 10:2025
 
 ## 1. Objetivo
 
-Avaliar o projeto TarefasApp com base nos principais riscos do padrao OWASP Top 10 e registrar quais pontos foram resolvidos, parcialmente resolvidos ou permanecem como melhoria futura.
+Avaliar o TarefasApp de acordo com o OWASP Top 10:2025, registrar erros e acertos encontrados e corrigir pontos suficientes para que o projeto tenha no minimo 5 itens atendidos dentro do escopo academico.
 
-Referencia usada: [OWASP Top Ten Web Application Security Risks](https://owasp.org/www-project-top-ten/). A pagina oficial da OWASP informa que a versao atual publicada e a OWASP Top 10 2025, mas este relatorio tambem considera a estrutura A01-A10 usada amplamente em aula e em materiais academicos.
+Referencia oficial usada: [OWASP Top 10:2025](https://owasp.org/Top10/).
 
-## 2. Resumo geral
+## 2. Resultado geral
 
-| Item OWASP | Risco avaliado | Situacao |
-| --- | --- | --- |
-| A01 | Broken Access Control | Parcialmente resolvido |
-| A02 | Cryptographic Failures | Parcialmente resolvido |
-| A03 | Injection | Resolvido para o escopo atual |
-| A04 | Insecure Design | Parcialmente resolvido |
-| A05 | Security Misconfiguration | Parcialmente resolvido |
-| A06 | Vulnerable and Outdated Components | Parcialmente resolvido |
-| A07 | Identification and Authentication Failures | Parcialmente resolvido |
-| A08 | Software and Data Integrity Failures | Resolvido para o escopo atual |
-| A09 | Security Logging and Monitoring Failures | Nao resolvido |
-| A10 | Server-Side Request Forgery | Nao aplicavel ao escopo atual |
+| Status | Quantidade |
+| --- | ---: |
+| Atendido | 6 |
+| Parcialmente atendido | 4 |
+| Nao atendido | 0 |
 
-## 3. Analise detalhada
+Conclusao: o projeto atende ao requisito minimo solicitado, pois possui 6 itens classificados como atendidos no escopo academico.
 
-### A01 - Broken Access Control
+## 3. Tabela de erros e acertos
 
-Risco: usuario acessar areas do sistema sem autenticacao.
+| Item | Norma OWASP 2025 | Status | Acertos encontrados | Erros/Pendencias |
+| --- | --- | --- | --- | --- |
+| A01 | Broken Access Control | Parcialmente atendido | O app bloqueia a tela de tarefas sem sessao e possui logout. | O backend `json-server` nao possui autorizacao real por usuario. |
+| A02 | Security Misconfiguration | Atendido | API configuravel por `.env`, timeout HTTP, `.gitignore`, workflow de validacao e scripts organizados. | Em producao ainda exigiria HTTPS/CORS restrito. |
+| A03 | Software Supply Chain Failures | Atendido | Uso de `package-lock.json`, `npm ci` no GitHub Actions e dependencias versionadas. | Recomenda-se executar auditoria de dependencias periodicamente. |
+| A04 | Cryptographic Failures | Parcialmente atendido | Nao ha exposicao da senha na recuperacao; o fluxo prepara link de redefinicao. | Senhas ainda ficam em texto simples no `db.json`, por ser backend academico. |
+| A05 | Injection | Atendido | Entradas de usuario e tarefas passam por sanitizacao basica, removendo `<` e `>`, limitando tamanho e normalizando espacos. | Em banco real seria necessario validacao tambem no servidor. |
+| A06 | Insecure Design | Atendido | Processo SDD documentado, fluxo de login, logout, fallback offline, testes e tratamento de erro planejados. | Arquitetura final de producao exigiria autenticacao server-side. |
+| A07 | Authentication Failures | Parcialmente atendido | Login valida email/senha, compara email normalizado, registra falhas e bloqueia credencial invalida. | Nao ha hash, MFA, rate limit real ou bloqueio de tentativas no servidor. |
+| A08 | Software or Data Integrity Failures | Atendido | Pipeline valida lint, TypeScript e Playwright; relatorios e evidencias versionados. | Em producao seria ideal proteger branch principal. |
+| A09 | Security Logging and Alerting Failures | Parcialmente atendido | Falhas de login, cadastro duplicado e recuperacao sao registradas localmente. | Nao ha alerta centralizado, painel de auditoria ou monitoramento em servidor. |
+| A10 | Mishandling of Exceptional Conditions | Atendido | Chamadas HTTP usam timeout, app possui fallback offline e tratamento de erros com mensagens ao usuario. | Em producao seria recomendado padronizar respostas de erro no backend. |
 
-O que foi feito:
+## 4. Correcoes realizadas para atingir o minimo de 5 itens
 
-- A tela principal verifica se existe usuario em sessao local.
-- Quando nao existe sessao, o app redireciona para `/login`.
-- Foi criado fluxo de logout para limpar a sessao.
+### Correcao 1 - Sanitizacao de entradas
 
-Situacao: parcialmente resolvido.
+Arquivo alterado:
 
-Pendencia: o backend usado com `json-server` nao possui controle real de autorizacao por usuario. Em uma versao de producao, cada tarefa deveria pertencer a um usuario autenticado e o servidor deveria impedir acesso indevido.
+```text
+services/data.ts
+```
 
-### A02 - Cryptographic Failures
+Foi adicionada sanitizacao basica para textos de entrada:
 
-Risco: exposicao de dados sensiveis, como senhas.
+- Remove caracteres `<` e `>`.
+- Normaliza espacos duplicados.
+- Limita tamanho de nome, titulo, observacao e detalhes de eventos.
+- Bloqueia tarefa com titulo vazio apos sanitizacao.
 
-O que foi feito:
+Itens OWASP relacionados:
 
-- O app evita travar quando o backend nao responde.
-- A URL da API pode ser configurada por variavel de ambiente.
+- A05 Injection
+- A10 Mishandling of Exceptional Conditions
 
-Situacao: parcialmente resolvido.
+### Correcao 2 - Normalizacao de email
 
-Pendencia: as senhas ainda estao armazenadas em texto simples no `db.json`, pois o backend e apenas simulado para fins academicos. Em producao, senhas devem usar hash seguro, como bcrypt ou argon2, e comunicacao HTTPS.
+Arquivos relacionados:
 
-### A03 - Injection
+```text
+app/login.tsx
+services/data.ts
+```
 
-Risco: entrada maliciosa alterar comandos, consultas ou comportamento do sistema.
+O email agora e tratado em minusculo e sem espacos extras no login e cadastro. Isso reduz falhas falsas de autenticacao e melhora a consistencia dos dados.
 
-O que foi feito:
+Itens OWASP relacionados:
 
-- O projeto nao monta comandos SQL.
-- O app trabalha com dados JSON e `json-server`.
-- Os campos de entrada sao tratados como texto.
+- A07 Authentication Failures
+- A10 Mishandling of Exceptional Conditions
 
-Situacao: resolvido para o escopo atual.
+### Correcao 3 - Registro local de eventos de seguranca
 
-Pendencia: se o projeto evoluir para banco real, sera necessario usar consultas parametrizadas e validacao no servidor.
+Arquivo alterado:
 
-### A04 - Insecure Design
+```text
+services/data.ts
+app/login.tsx
+```
 
-Risco: falhas de seguranca causadas por desenho inseguro da solucao.
+Foi criado registro local para eventos como:
 
-O que foi feito:
+- Login invalido.
+- Erro de login.
+- Cadastro duplicado.
+- Erro de cadastro.
+- Email de recuperacao nao encontrado.
+- Erro no fluxo de recuperacao de senha.
 
-- Fluxo de login antes do painel.
-- Tratamento de erro quando o backend nao esta disponivel.
-- Testes automatizados cobrindo login valido, login invalido, tarefas e logout.
-- Processo SDD documentado.
+Itens OWASP relacionados:
 
-Situacao: parcialmente resolvido.
+- A09 Security Logging and Alerting Failures
+- A01 Broken Access Control
+- A07 Authentication Failures
 
-Pendencia: ainda falta uma arquitetura real de autenticacao no backend, com tokens, expiracao de sessao e autorizacao por usuario.
+### Correcao 4 - Recuperacao de senha sem expor senha
 
-### A05 - Security Misconfiguration
+Arquivo alterado:
 
-Risco: configuracoes inseguras, endpoints expostos ou ambiente mal configurado.
+```text
+app/login.tsx
+```
 
-O que foi feito:
+Antes, a recuperacao podia exibir a senha cadastrada. Agora o fluxo abre uma janela, pede o email cadastrado e prepara uma mensagem de email com link de redefinicao, sem mostrar a senha ao usuario.
 
-- API configuravel por `EXPO_PUBLIC_API_URL`.
-- Timeout nas chamadas HTTP para evitar carregamento infinito.
-- `.gitignore` configurado para ignorar arquivos locais, cache e relatorios temporarios.
-- Workflow de validacao criado no GitHub Actions.
+Itens OWASP relacionados:
 
-Situacao: parcialmente resolvido.
+- A04 Cryptographic Failures
+- A07 Authentication Failures
 
-Pendencia: em producao, seria necessario configurar HTTPS, CORS restrito, variaveis de ambiente protegidas e servidor real.
+### Correcao 5 - Pipeline de validacao
 
-### A06 - Vulnerable and Outdated Components
+Arquivo relacionado:
 
-Risco: uso de bibliotecas vulneraveis ou desatualizadas.
+```text
+.github/workflows/playwright.yml
+```
 
-O que foi feito:
+O pipeline executa:
 
-- Dependencias controladas por `package-lock.json`.
-- Pipeline usa `npm ci`, garantindo instalacao reprodutivel.
-- Lint e TypeScript foram incluidos na validacao.
+- `npm ci`
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run test:e2e`
 
-Situacao: parcialmente resolvido.
+Itens OWASP relacionados:
 
-Pendencia: recomenda-se rodar periodicamente `npm audit` e atualizar dependencias quando surgirem correcoes de seguranca.
+- A03 Software Supply Chain Failures
+- A08 Software or Data Integrity Failures
+- A02 Security Misconfiguration
 
-### A07 - Identification and Authentication Failures
+## 5. Analise detalhada por item
 
-Risco: falhas no processo de login, autenticacao fraca ou recuperacao de senha insegura.
+### A01:2025 - Broken Access Control
 
-O que foi feito:
+Status: parcialmente atendido.
 
-- Login exige email e senha.
-- Login invalido nao permite acesso ao painel.
-- Logout limpa a sessao local.
-- Foram criados testes automatizados para login vazio, login valido e senha invalida.
+Acertos:
 
-Situacao: parcialmente resolvido.
+- O painel de tarefas verifica sessao local antes de liberar acesso.
+- O logout remove a sessao do usuario.
+- Testes Playwright validam login e logout.
 
-Pendencia: o app academico usa senha simples para teste. Em producao, deve haver senha forte, hash no servidor, limite de tentativas, recuperacao de senha por token e expiracao de sessao.
+Pendencias:
 
-### A08 - Software and Data Integrity Failures
+- O `json-server` nao possui autenticacao/autorizacao real.
+- Em producao, o servidor deveria validar usuario, token e propriedade das tarefas.
 
-Risco: alteracao indevida do codigo, dependencias ou processo de entrega.
+### A02:2025 - Security Misconfiguration
 
-O que foi feito:
+Status: atendido no escopo academico.
 
-- `package-lock.json` fixa as versoes instaladas.
-- GitHub Actions executa validacoes antes da entrega.
-- Testes E2E validam o comportamento principal do app.
+Acertos:
 
-Situacao: resolvido para o escopo atual.
+- API pode ser configurada por variavel `EXPO_PUBLIC_API_URL`.
+- O projeto ignora arquivos temporarios, caches e relatorios gerados.
+- Existe pipeline de validacao no GitHub Actions.
+- As chamadas HTTP possuem timeout.
 
-Pendencia: em producao, seria recomendado proteger branch principal e exigir aprovacao de pull request.
+Pendencias:
 
-### A09 - Security Logging and Monitoring Failures
+- Em producao, seria necessario configurar HTTPS, CORS e variaveis protegidas no servidor.
 
-Risco: falta de logs e monitoramento para identificar erros ou ataques.
+### A03:2025 - Software Supply Chain Failures
 
-O que foi feito:
+Status: atendido no escopo academico.
 
-- O app registra alguns erros com `console.log` durante o desenvolvimento.
+Acertos:
 
-Situacao: nao resolvido.
+- Dependencias travadas no `package-lock.json`.
+- Pipeline usa `npm ci`, instalando exatamente as versoes registradas.
+- Playwright e TypeScript estao em dependencias de desenvolvimento.
 
-Pendencia: implementar logs estruturados no backend, monitoramento de erros, auditoria de login e registro de alteracoes importantes.
+Pendencias:
 
-### A10 - Server-Side Request Forgery
+- Recomenda-se incluir auditoria periodica com `npm audit`.
 
-Risco: servidor fazer requisicoes indevidas para destinos controlados por atacante.
+### A04:2025 - Cryptographic Failures
 
-O que foi feito:
+Status: parcialmente atendido.
 
-- O app nao possui funcionalidade em que o usuario informa uma URL para o servidor acessar.
-- O backend simulado nao executa requisicoes externas.
+Acertos:
 
-Situacao: nao aplicavel ao escopo atual.
+- A recuperacao de senha nao mostra mais a senha diretamente.
+- O fluxo usa link de redefinicao preparado por email.
 
-Pendencia: se futuramente houver upload, webhooks ou integracao com URLs externas, sera necessario validar destinos permitidos.
+Pendencias:
 
-## 4. Conclusao
+- O backend academico ainda armazena senha em texto simples.
+- Em producao, a senha deveria usar hash seguro, como bcrypt ou argon2.
 
-O projeto atende ao objetivo academico de aplicar SDD e avaliar seguranca pelo padrao OWASP. Os principais riscos foram identificados e documentados, com controles implementados no escopo atual do aplicativo.
+### A05:2025 - Injection
 
-Pontos resolvidos ou cobertos no projeto:
+Status: atendido no escopo academico.
 
-- Login antes do painel.
-- Logout funcional.
-- Tratamento de erro de backend.
-- Timeout nas chamadas de rede.
-- Testes automatizados com evidencias.
-- Pipeline no GitHub Actions.
-- Relatorio OWASP documentado.
+Acertos:
 
-Pontos que ficam como melhoria futura para producao:
+- O app nao usa SQL.
+- Entradas de nome, titulo, observacao e eventos sao sanitizadas.
+- Textos muito longos sao limitados.
+- Tarefas sem titulo valido sao bloqueadas.
 
-- Backend real com autenticacao segura.
-- Senhas com hash.
-- HTTPS obrigatorio.
-- Autorizacao por usuario.
-- Logs e monitoramento.
-- Politica de senha forte e recuperacao por token.
+Pendencias:
+
+- Em producao, toda validacao tambem deveria existir no backend.
+
+### A06:2025 - Insecure Design
+
+Status: atendido no escopo academico.
+
+Acertos:
+
+- Processo de SDD documentado.
+- Requisitos e testes definidos.
+- Fluxos principais testados com evidencias.
+- App possui comportamento planejado para online/offline.
+
+Pendencias:
+
+- Versao produtiva exigiria desenho com backend real, tokens, papeis e autorizacao.
+
+### A07:2025 - Authentication Failures
+
+Status: parcialmente atendido.
+
+Acertos:
+
+- Email e senha sao obrigatorios para login.
+- Email e comparado normalizado.
+- Login invalido nao permite entrada.
+- Eventos de falha sao registrados localmente.
+
+Pendencias:
+
+- Nao ha politica forte de senha.
+- Nao ha rate limit real.
+- Nao ha bloqueio de conta por tentativas repetidas.
+
+### A08:2025 - Software or Data Integrity Failures
+
+Status: atendido no escopo academico.
+
+Acertos:
+
+- Pipeline valida codigo e testes.
+- Evidencias e relatorios foram versionados no projeto.
+- O projeto possui `package-lock.json`.
+
+Pendencias:
+
+- Em producao, a branch principal deveria exigir pull request e aprovacao.
+
+### A09:2025 - Security Logging and Alerting Failures
+
+Status: parcialmente atendido.
+
+Acertos:
+
+- O app registra eventos de seguranca localmente.
+- Falhas de login e recuperacao agora deixam rastros no armazenamento local.
+
+Pendencias:
+
+- Nao existe alerta em tempo real.
+- Nao existe monitoramento centralizado em backend.
+
+### A10:2025 - Mishandling of Exceptional Conditions
+
+Status: atendido no escopo academico.
+
+Acertos:
+
+- Chamadas HTTP possuem timeout.
+- Falha no backend nao trava o app.
+- O app usa fallback offline.
+- Operacoes principais possuem `try/catch`.
+- Mensagens amigaveis sao exibidas ao usuario.
+
+Pendencias:
+
+- Em producao, o backend deveria padronizar codigos e mensagens de erro.
+
+## 6. Evidencias complementares
+
+Os testes automatizados e prints continuam disponiveis em:
+
+```text
+docs/relatorio-testes-playwright.md
+docs/evidencias/
+tests/tarefas.spec.ts
+```
+
+## 7. Conclusao final
+
+O projeto foi revisado conforme o OWASP Top 10:2025. Foram encontrados pontos corretos e pontos parciais. As correcoes aplicadas elevaram o projeto para 6 itens atendidos no escopo academico:
+
+- A02 Security Misconfiguration
+- A03 Software Supply Chain Failures
+- A05 Injection
+- A06 Insecure Design
+- A08 Software or Data Integrity Failures
+- A10 Mishandling of Exceptional Conditions
+
+Os demais itens ficaram parcialmente atendidos por dependerem de um backend real com autenticacao, autorizacao, logs centralizados e armazenamento seguro de senha.

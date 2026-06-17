@@ -12,7 +12,12 @@ import {
   View,
 } from "react-native";
 
-import { createUsuario, getUsuarios, setSessionUser } from "@/services/data";
+import {
+  createUsuario,
+  getUsuarios,
+  registerSecurityEvent,
+  setSessionUser,
+} from "@/services/data";
 
 type AuthMode = "login" | "cadastro";
 
@@ -59,6 +64,7 @@ export default function Login() {
       );
 
       if (!usuarioEncontrado) {
+        await registerSecurityEvent("LOGIN_INVALIDO", emailInformado);
         alert("Email ou senha invalidos");
         return;
       }
@@ -72,6 +78,7 @@ export default function Login() {
       router.replace("/(tabs)");
     } catch (erro) {
       console.log(erro);
+      await registerSecurityEvent("ERRO_LOGIN", email.trim());
       alert("Nao foi possivel fazer login. Tente novamente.");
     } finally {
       setCarregando(false);
@@ -110,11 +117,13 @@ export default function Login() {
       router.replace("/(tabs)");
     } catch (erro) {
       if (erro instanceof Error && erro.message === "EMAIL_JA_CADASTRADO") {
+        await registerSecurityEvent("CADASTRO_DUPLICADO", email.trim());
         alert("Esse email ja esta cadastrado.");
         return;
       }
 
       console.log(erro);
+      await registerSecurityEvent("ERRO_CADASTRO", email.trim());
       alert("Nao foi possivel criar a conta. Tente novamente.");
     } finally {
       setCarregando(false);
@@ -148,6 +157,7 @@ export default function Login() {
       );
 
       if (!usuarioEncontrado) {
+        await registerSecurityEvent("RECUPERACAO_EMAIL_NAO_ENCONTRADO", emailInformado);
         alert("Email nao encontrado. Verifique se digitou o email cadastrado.");
         return;
       }
@@ -164,6 +174,7 @@ export default function Login() {
       const podeAbrirEmail = await Linking.canOpenURL(url);
 
       if (!podeAbrirEmail) {
+        await registerSecurityEvent("RECUPERACAO_EMAIL_APP_INDISPONIVEL", emailInformado);
         alert("Nao foi possivel abrir o aplicativo de email neste aparelho.");
         return;
       }
@@ -173,6 +184,7 @@ export default function Login() {
       setMensagem("Link de redefinicao preparado para o email cadastrado.");
     } catch (erro) {
       console.log(erro);
+      await registerSecurityEvent("ERRO_RECUPERACAO_SENHA", emailRecuperacao.trim());
       alert("Nao foi possivel preparar o email de redefinicao.");
     } finally {
       setEnviandoRecuperacao(false);

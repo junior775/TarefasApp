@@ -10,7 +10,7 @@ Este repositorio contem os itens solicitados para a entrega final da disciplina:
 - 10 casos de teste automatizados com Playwright.
 - Evidencias dos testes com prints.
 - Relatorio completo dos testes.
-- Relatorio de seguranca com base no padrao OWASP.
+- Relatorio de seguranca com base no padrao OWASP Top 10:2025.
 - Pipeline no GitHub Actions para validar o projeto.
 
 ## Documentacao
@@ -105,7 +105,7 @@ Ele executa:
 - `npm run test:e2e`
 - Upload do relatorio HTML do Playwright
 
-## Seguranca
+## Seguranca OWASP 2025
 
 A analise OWASP esta documentada em:
 
@@ -113,4 +113,4 @@ A analise OWASP esta documentada em:
 docs/relatorio-seguranca-owasp.md
 ```
 
-O relatorio informa quais itens foram resolvidos, parcialmente resolvidos, nao resolvidos ou nao aplicaveis ao escopo academico do projeto.
+O relatorio informa erros, acertos e correcoes realizadas com base nos 10 itens do OWASP Top 10:2025.

@@ -43,6 +43,7 @@ type CreateTaskInput = {
 const LOCAL_USERS_KEY = "local_usuarios";
 const LOCAL_TASKS_KEY = "local_tarefas";
 const SESSION_USER_KEY = "usuario";
+const SECURITY_EVENTS_KEY = "security_events";
 const memoryStorage = new Map<string, string>();
 
 const DEFAULT_USERS: Usuario[] = [
@@ -59,6 +60,35 @@ const DEFAULT_TASK_VALUES = {
   categoria: "Pessoal" as Categoria,
   observacao: "",
 };
+
+function sanitizeText(value: string, maxLength = 160) {
+  return value
+    .replace(/[<>]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
+export async function registerSecurityEvent(evento: string, detalhe = "") {
+  const events = await readJson<
+    Array<{ id: number; evento: string; detalhe: string; criadoEm: string }>
+  >(SECURITY_EVENTS_KEY, []);
+  const nextId = events.length > 0 ? Math.max(...events.map((item) => item.id)) + 1 : 1;
+
+  await writeJson(SECURITY_EVENTS_KEY, [
+    ...events.slice(-49),
+    {
+      id: nextId,
+      evento: sanitizeText(evento, 80),
+      detalhe: sanitizeText(detalhe, 160),
+      criadoEm: new Date().toISOString(),
+    },
+  ]);
+}
 
 function normalizeTask(task: Partial<Tarefa> & Pick<Tarefa, "id" | "titulo" | "concluida">): Tarefa {
   return {
@@ -185,7 +215,8 @@ export async function getUsuarios() {
 }
 
 export async function createUsuario({ nome, email, senha }: CreateUserInput) {
-  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedName = sanitizeText(nome, 80);
   const { usuarios } = await getUsuarios();
   const usuarioExistente = usuarios.find(
     (usuario) => usuario.email.toLowerCase() === normalizedEmail
@@ -200,9 +231,9 @@ export async function createUsuario({ nome, email, senha }: CreateUserInput) {
       usuarios.length > 0
         ? String(Math.max(...usuarios.map((usuario) => Number(usuario.id) || 0)) + 1)
         : "1",
-    nome: nome.trim(),
+    nome: normalizedName,
     email: normalizedEmail,
-    senha,
+    senha: senha.trim(),
   };
 
   try {
@@ -264,12 +295,19 @@ export async function createTarefa({
   categoria = DEFAULT_TASK_VALUES.categoria,
   observacao = DEFAULT_TASK_VALUES.observacao,
 }: CreateTaskInput) {
+  const sanitizedTitle = sanitizeText(titulo, 120);
+  const sanitizedObservation = sanitizeText(observacao, 240);
+
+  if (!sanitizedTitle) {
+    throw new Error("TITULO_INVALIDO");
+  }
+
   const payload = {
-    titulo,
+    titulo: sanitizedTitle,
     concluida: false,
     prioridade,
     categoria,
-    observacao,
+    observacao: sanitizedObservation,
     criadaEm: new Date().toISOString(),
   };
 
@@ -345,7 +383,18 @@ export async function updateTarefa(item: Tarefa) {
 }
 
 export async function saveTarefa(item: Tarefa) {
-  const updatedItem = normalizeTask(item);
+  const sanitizedTitle = sanitizeText(item.titulo, 120);
+  const sanitizedObservation = sanitizeText(item.observacao, 240);
+
+  if (!sanitizedTitle) {
+    throw new Error("TITULO_INVALIDO");
+  }
+
+  const updatedItem = normalizeTask({
+    ...item,
+    titulo: sanitizedTitle,
+    observacao: sanitizedObservation,
+  });
 
   try {
     const resposta = await apiFetch(`/tarefas/${item.id}`, {

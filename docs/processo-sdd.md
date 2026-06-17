@@ -7,7 +7,7 @@ Aplicar o processo de SDD no projeto TarefasApp, usando seguranca e qualidade co
 Neste projeto, o SDD foi organizado como um fluxo de desenvolvimento com validacao continua:
 
 1. Definir os requisitos principais do sistema.
-2. Identificar riscos de seguranca com base no padrao OWASP.
+2. Identificar riscos de seguranca com base no padrao OWASP Top 10:2025.
 3. Implementar controles de seguranca e tratamento de erros.
 4. Criar testes automatizados com Playwright.
 5. Gerar evidencias com prints.
@@ -103,4 +103,4 @@ npx tsc --noEmit
 
 ## 7. Conclusao
 
-O processo de SDD foi aplicado ao projeto por meio da definicao dos requisitos, analise de seguranca OWASP, testes automatizados com Playwright, evidencias com prints e pipeline de validacao no GitHub Actions.
+O processo de SDD foi aplicado ao projeto por meio da definicao dos requisitos, analise de seguranca OWASP Top 10:2025, testes automatizados com Playwright, evidencias com prints e pipeline de validacao no GitHub Actions.
