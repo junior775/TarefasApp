@@ -121,10 +121,23 @@ async function writeJson(key: string, value: unknown) {
 
 async function ensureLocalUsers() {
   const existingUsers = await readJson<Usuario[]>(LOCAL_USERS_KEY, []);
+  const missingDefaultUsers = DEFAULT_USERS.filter(
+    (defaultUser) =>
+      !existingUsers.some(
+        (existingUser) =>
+          existingUser.email.toLowerCase() === defaultUser.email.toLowerCase()
+      )
+  );
 
   if (existingUsers.length === 0) {
     await writeJson(LOCAL_USERS_KEY, DEFAULT_USERS);
     return DEFAULT_USERS;
+  }
+
+  if (missingDefaultUsers.length > 0) {
+    const updatedUsers = [...existingUsers, ...missingDefaultUsers];
+    await writeJson(LOCAL_USERS_KEY, updatedUsers);
+    return updatedUsers;
   }
 
   return existingUsers;
@@ -151,7 +164,18 @@ export async function getUsuarios() {
       throw new Error("Falha ao buscar usuarios");
     }
 
-    const usuarios = (await resposta.json()) as Usuario[];
+    const remoteUsers = (await resposta.json()) as Usuario[];
+    const usuarios = [
+      ...remoteUsers,
+      ...DEFAULT_USERS.filter(
+        (defaultUser) =>
+          !remoteUsers.some(
+            (remoteUser) =>
+              remoteUser.email.toLowerCase() === defaultUser.email.toLowerCase()
+          )
+      ),
+    ];
+
     await writeJson(LOCAL_USERS_KEY, usuarios);
     return { usuarios, offline: false };
   } catch {

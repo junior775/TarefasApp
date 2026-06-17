@@ -3,6 +3,7 @@ import { useState } from "react";
 import {
   KeyboardAvoidingView,
   Linking,
+  Modal,
   Platform,
   ScrollView,
   Text,
@@ -23,6 +24,9 @@ export default function Login() {
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [carregando, setCarregando] = useState(false);
   const [mensagem, setMensagem] = useState("");
+  const [modalRecuperacaoAberto, setModalRecuperacaoAberto] = useState(false);
+  const [emailRecuperacao, setEmailRecuperacao] = useState("");
+  const [enviandoRecuperacao, setEnviandoRecuperacao] = useState(false);
   const router = useRouter();
 
   const limparFormulario = () => {
@@ -45,10 +49,13 @@ export default function Login() {
       setCarregando(true);
       setMensagem("");
 
+      const emailInformado = email.trim().toLowerCase();
+      const senhaInformada = senha.trim();
       const { usuarios, offline } = await getUsuarios();
       const usuarioEncontrado = usuarios.find(
         (usuario) =>
-          usuario.email === email.trim() && usuario.senha === senha.trim()
+          usuario.email.toLowerCase() === emailInformado &&
+          usuario.senha === senhaInformada
       );
 
       if (!usuarioEncontrado) {
@@ -114,37 +121,62 @@ export default function Login() {
     }
   };
 
-  const recuperarSenha = async () => {
-    const emailInformado = email.trim().toLowerCase();
+  const abrirRecuperacaoSenha = () => {
+    setEmailRecuperacao(email.trim());
+    setModalRecuperacaoAberto(true);
+  };
+
+  const fecharRecuperacaoSenha = () => {
+    setEmailRecuperacao("");
+    setModalRecuperacaoAberto(false);
+  };
+
+  const enviarLinkRedefinicao = async () => {
+    const emailInformado = emailRecuperacao.trim().toLowerCase();
 
     if (!emailInformado) {
-      alert("Digite seu email para recuperar a senha.");
+      alert("Digite o email cadastrado para receber o link.");
       return;
     }
 
-    const { usuarios } = await getUsuarios();
-    const usuarioEncontrado = usuarios.find(
-      (usuario) => usuario.email.toLowerCase() === emailInformado
-    );
+    try {
+      setEnviandoRecuperacao(true);
 
-    if (!usuarioEncontrado) {
-      alert("Email nao encontrado.");
-      return;
+      const { usuarios } = await getUsuarios();
+      const usuarioEncontrado = usuarios.find(
+        (usuario) => usuario.email.toLowerCase() === emailInformado
+      );
+
+      if (!usuarioEncontrado) {
+        alert("Email nao encontrado. Verifique se digitou o email cadastrado.");
+        return;
+      }
+
+      const token = `${usuarioEncontrado.id}-${Date.now()}`;
+      const linkRedefinicao = `https://tarefasapp.local/redefinir-senha?email=${encodeURIComponent(
+        usuarioEncontrado.email
+      )}&token=${encodeURIComponent(token)}`;
+      const assunto = encodeURIComponent("Redefinicao de senha - TarefasApp");
+      const corpo = encodeURIComponent(
+        `Ola ${usuarioEncontrado.nome},\n\nRecebemos uma solicitacao para redefinir sua senha no TarefasApp.\n\nClique no link abaixo para redefinir sua senha:\n${linkRedefinicao}\n\nSe voce nao solicitou esta redefinicao, ignore este email.`
+      );
+      const url = `mailto:${usuarioEncontrado.email}?subject=${assunto}&body=${corpo}`;
+      const podeAbrirEmail = await Linking.canOpenURL(url);
+
+      if (!podeAbrirEmail) {
+        alert("Nao foi possivel abrir o aplicativo de email neste aparelho.");
+        return;
+      }
+
+      await Linking.openURL(url);
+      fecharRecuperacaoSenha();
+      setMensagem("Link de redefinicao preparado para o email cadastrado.");
+    } catch (erro) {
+      console.log(erro);
+      alert("Nao foi possivel preparar o email de redefinicao.");
+    } finally {
+      setEnviandoRecuperacao(false);
     }
-
-    const assunto = encodeURIComponent("Recuperacao de senha - TarefasApp");
-    const corpo = encodeURIComponent(
-      `Ola ${usuarioEncontrado.nome},\n\nSua senha cadastrada no TarefasApp e: ${usuarioEncontrado.senha}\n\nSe voce nao solicitou esta recuperacao, ignore esta mensagem.`
-    );
-    const url = `mailto:${usuarioEncontrado.email}?subject=${assunto}&body=${corpo}`;
-    const podeAbrirEmail = await Linking.canOpenURL(url);
-
-    if (!podeAbrirEmail) {
-      alert(`Senha cadastrada: ${usuarioEncontrado.senha}`);
-      return;
-    }
-
-    await Linking.openURL(url);
   };
 
   return (
@@ -431,7 +463,7 @@ export default function Login() {
 
           {modo === "login" ? (
             <TouchableOpacity
-              onPress={recuperarSenha}
+              onPress={abrirRecuperacaoSenha}
               style={{
                 alignSelf: "flex-end",
                 marginBottom: 16,
@@ -481,6 +513,100 @@ export default function Login() {
           ) : null}
         </View>
       </ScrollView>
+
+      <Modal
+        animationType="fade"
+        transparent
+        visible={modalRecuperacaoAberto}
+        onRequestClose={fecharRecuperacaoSenha}
+      >
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            padding: 22,
+            backgroundColor: "rgba(22, 37, 58, 0.58)",
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#fffaf4",
+              borderRadius: 28,
+              padding: 22,
+              borderWidth: 1,
+              borderColor: "#f0e0c8",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 24,
+                fontWeight: "800",
+                color: "#16253a",
+                marginBottom: 8,
+              }}
+            >
+              Redefinir senha
+            </Text>
+
+            <Text style={{ color: "#6f7a86", lineHeight: 22, marginBottom: 18 }}>
+              Digite o email cadastrado. Se ele existir no sistema, vamos abrir o
+              app de email com um link de redefinicao pronto para envio.
+            </Text>
+
+            <Text style={{ color: "#3d4b5b", fontWeight: "700", marginBottom: 8 }}>
+              Email cadastrado
+            </Text>
+            <TextInput
+              placeholder="Digite seu email cadastrado"
+              placeholderTextColor="#8e98a3"
+              value={emailRecuperacao}
+              onChangeText={setEmailRecuperacao}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              style={{
+                backgroundColor: "#ffffff",
+                borderRadius: 18,
+                paddingHorizontal: 16,
+                paddingVertical: 15,
+                marginBottom: 16,
+                borderWidth: 1,
+                borderColor: "#e4dccd",
+                color: "#182332",
+              }}
+            />
+
+            <TouchableOpacity
+              onPress={enviarLinkRedefinicao}
+              disabled={enviandoRecuperacao}
+              style={{
+                backgroundColor: enviandoRecuperacao ? "#5e8ab7" : "#245d91",
+                borderRadius: 18,
+                paddingVertical: 16,
+                alignItems: "center",
+                marginBottom: 10,
+              }}
+            >
+              <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>
+                {enviandoRecuperacao ? "Enviando..." : "Enviar link de redefinicao"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={fecharRecuperacaoSenha}
+              style={{
+                backgroundColor: "#f1ebe0",
+                borderRadius: 18,
+                paddingVertical: 14,
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ color: "#5f6770", fontSize: 15, fontWeight: "800" }}>
+                Cancelar
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
